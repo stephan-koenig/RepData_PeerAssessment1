@@ -46,39 +46,39 @@ if (!file.exists("activity.csv")) {
 # Load .csv file as data frame table
 activity <- tbl_df(read.csv("activity.csv"))
 ```
-File loaded downloaded: `r dateDownloaded`
+File downloaded on: `r dateDownloaded`
 
 ## What is mean total number of steps taken per day?
-```{r}
+```{r dailyActivity}
 # Discard row with NAs, group by day, and calculate total steps per day.
 dailyActivity <- na.omit(activity) %>% group_by(date) %>%
     summarize(totalSteps = sum(steps))
 ```
 
-
-```{r Histogram total steps, echo=FALSE}
-# Plot data ====================================================================
+```{r histogramSteps, echo=FALSE}
 # Make a histogram of the total number of steps taken each day.
-# Determine optimal binwidth for histogram using the Freedman-Diaconis rule.
+# Determine optimal bin number and corresponding breaks for histogram using
+# the Freedman-Diaconis rule.
 binNumber <- nclass.FD(dailyActivity$totalSteps)
+binBreaks <- seq(min(dailyActivity$totalSteps),
+                 max(dailyActivity$totalSteps),
+                 length.out = binNumber + 1)
 
 # Construct histogram
-ggplot(dailyActivity, aes(totalSteps)) +
-    geom_histogram(aes(y = ..count../sum(..count..)),
+ggplot(dailyActivity) +
+    geom_histogram(aes(totalSteps, ..count../sum(..count..) * 100),
                    origin = min(dailyActivity$totalSteps),
-                   bins = binNumber,
+                   breaks = binBreaks,
                    col = "black",
-                   right = TRUE,
-                   fill= "grey",
-                   na.rm = TRUE) +
-    xlim(c(min(dailyActivity$totalSteps),
-           max(dailyActivity$totalSteps))) +
+                   fill= "grey") +
+    scale_x_continuous(breaks = round(binBreaks)) +
     ggtitle("Normalized Histogram of Total Steps Per Day") +
     xlab("total steps per day") +
-    ylab("percent of days")
+    ylab("percent of days [%]")
 ```
 
-```{r Mean and median calculations, echo=FALSE}
+
+```{r meanMedianCalc, echo=FALSE}
 # Calculate mean and median of the total steps taken per day
 meanSteps <- mean(dailyActivity$totalSteps)
 medianSteps <- median(dailyActivity$totalSteps)
@@ -88,7 +88,10 @@ The mean is `r format(meanSteps, digits = 7)` and the median is `r medianSteps`
 for total number of steps taken per day.
 
 ## What is the average daily activity pattern?
-
+```{r}
+intervalActivity <- na.omit(activity) %>% group_by(interval) %>%
+    summarize(meanSteps = mean(steps))
+```
 
 
 ## Imputing missing values
