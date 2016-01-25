@@ -7,7 +7,7 @@ output:
 
 ```{r loadPackages, echo=FALSE, results='hide', message=FALSE}
 # Load all required packages installing any that are missing.
-requiredPackages <- c("dplyr", "ggplot2")
+requiredPackages <- c("dplyr", "ggplot2", "lubridate")
 missingPackages <- !is.element(requiredPackages, installed.packages()[,1])
 missingPackages <- requiredPackages[missingPackages]
 if (length(missingPackages) != 0) install.packages(missingPackages)
@@ -80,6 +80,7 @@ ggplot(dailyActivity) +
                    col = "black",
                    fill= "grey") +
     scale_x_continuous(breaks = round(binBreaks)) +
+    ylim(0, 40) +
     ggtitle("Normalized Histogram of Total Steps Per Day") +
     xlab("total steps per day") +
     ylab("percent of days [%]")
@@ -133,6 +134,103 @@ of steps on average across all the days.
 
 ## Imputing missing values
 
+```{r numberNAs, echo=FALSE}
+# To count total number of NAs
+totalNAs <- sum(colSums(is.na(activity)))
+# To count rows with at least one NA
+rowsNA <- nrow(filter(activity, is.na(steps) | is.na(date) | is.na(interval)))
+```
+
+The activity dataset contained **`r rowsNA`** rows with at least one NA.
+In a new dataset, these NAs were imputed using the above calculated mean steps
+of the corresponding interval.
+
+```{r imputedNAs,  message=FALSE}
+imputedActivity <- left_join(activity, intervalActivity) %>%
+    mutate(imputedSteps = ifelse(is.na(steps),
+                                 meanSteps,
+                                 steps)) %>%
+    select(date, interval, imputedSteps)
+
+```
+
+The total steps taken per day were recalculated and plotted as a histogram using
+the new dataset.
+
+```{r imputedDailyActivity}
+imputedDailyActivity <- group_by(imputedActivity, date) %>%
+    summarize(totalSteps = sum(imputedSteps))
+```
+
+```{r ImputedHistogramSteps, echo=FALSE}
+# Make a histogram of the total number of steps taken each day using the same
+# bin breaks
+# Construct histogram
+ggplot(imputedDailyActivity) +
+    geom_histogram(aes(totalSteps, ..count../sum(..count..) * 100),
+                   origin = min(imputedDailyActivity$totalSteps),
+                   breaks = binBreaks,
+                   col = "black",
+                   fill= "grey") +
+    scale_x_continuous(breaks = round(binBreaks)) +
+    ylim(0, 40) +
+    ggtitle("Imputed Normalized Histogram of Total Steps Per Day") +
+    xlab("total steps per day") +
+    ylab("percent of days [%]")
+```
+
+```{r ImputedMeanMedianCalc, echo=FALSE}
+# Calculate mean and median of the total steps taken per day
+imputedMeanSteps <- mean(imputedDailyActivity$totalSteps)
+imputedMedianSteps <- median(imputedDailyActivity$totalSteps)
+```
+
+The total number of steps taken per day for the imputed dataset have a mean of 
+**`r format(imputedMeanSteps, digits = 7)`** and a median of
+**`r format(imputedMedianSteps, digits = 7)`**, and are almost unchanged from the values reported
+for the original dataset. In contrast, the histogram shows a clearly higher
+percentage of days around the mean total step count for the imputed dataset than
+for the original.
+
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+The date of the dataset was parsed into the categories "weekday" or "weekend":
+
+```{r weekday}
+# Use lubridate to parse dates...
+imputedActivity <- mutate(imputedActivity, date = ymd(date)) %>%
+    # ...and weekdays to determine day of the week...
+    mutate(day = weekdays(date)) %>%
+    # ...which is used to determine weekday or weekend.
+    mutate(workOrFree = as.factor(ifelse(day %in% c("Saturday","Sunday"),
+                                         "weekend",
+                                         "weekday"))) %>%
+    # Group...
+    group_by(workOrFree, interval) %>%
+    # ...to calculate the mean steps for each interval for either weekday/end.
+    summarize(meanSteps = mean(imputedSteps))
+```
+
+This dataset was then used to determine the average daily activity pattern on
+either weekday or weekend.
+
+```{r multiLineGraphActivity, echo=FALSE}
+# Construct line graph with intervalActivity$interval as factor
+ggplot(imputedActivity, aes(x = as.factor(interval), y = meanSteps, group=1)) +
+    geom_line() +
+    facet_grid(workOrFree ~ .) +
+    scale_x_discrete(breaks = fullHours) +
+    ggtitle("Mean Steps Per 5-minute Interval Across Weekdays or Weekend") +
+    xlab("time interval (discrete)") +
+    ylab("mean of steps") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Compared to the weekday plot, the weekend plot shows less activity in the
+morning between approx. 5.30 and 8 AM, but more activity in the evening between
+7 and 9 PM. Overall the activity is more evenly distributed on weekends, while
+during weekdays there is a strong peak at 8.30 AM but far less activity
+throughout the rest of the day.
+
