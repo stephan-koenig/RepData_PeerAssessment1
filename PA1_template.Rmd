@@ -42,15 +42,23 @@ if (!file.exists("activity.zip") && !file.exists("activity.csv")) {
 if (!file.exists("activity.csv")) {
     unzip("activity.zip")
 }
+```
 
-# Load .csv file as data frame table
+File "activity.zip" was downloaded (on: **`r dateDownloaded`**) and unzipped to
+"activity.csv".
+
+```{r assignData}
 activity <- tbl_df(read.csv("activity.csv"))
 ```
-File downloaded on: `r dateDownloaded`
+
+
 
 ## What is mean total number of steps taken per day?
+
+Any NAs in the data were omitted, the total steps taken per day were
+calculated and plotted as a histogram:
+
 ```{r dailyActivity}
-# Discard row with NAs, group by day, and calculate total steps per day.
 dailyActivity <- na.omit(activity) %>% group_by(date) %>%
     summarize(totalSteps = sum(steps))
 ```
@@ -77,21 +85,50 @@ ggplot(dailyActivity) +
     ylab("percent of days [%]")
 ```
 
-
 ```{r meanMedianCalc, echo=FALSE}
 # Calculate mean and median of the total steps taken per day
 meanSteps <- mean(dailyActivity$totalSteps)
 medianSteps <- median(dailyActivity$totalSteps)
 ```
 
-The mean is `r format(meanSteps, digits = 7)` and the median is `r medianSteps`
-for total number of steps taken per day.
+The total number of steps taken per day have a mean of 
+**`r format(meanSteps, digits = 7)`** and a median of **`r medianSteps`**.
+
+
 
 ## What is the average daily activity pattern?
-```{r}
+
+To calculate the daily activity pattern, NAs were ommited, and the average
+number of steps per interval was calculated and plotted as a line graph:
+
+```{r intervalActivity}
 intervalActivity <- na.omit(activity) %>% group_by(interval) %>%
     summarize(meanSteps = mean(steps))
 ```
+
+```{r lineGraphActivity, echo=FALSE}
+# Construct line graph with intervalActivity$interval as factor
+labels <- intervalActivity$interval
+fullHours <- labels[labels %% 100 == 0] 
+ggplot(intervalActivity, aes(x = as.factor(interval), y = meanSteps, group=1)) +
+    geom_line() +
+    scale_x_discrete(breaks = fullHours) +
+    ggtitle("Mean Steps Per 5-minute Interval Across All Days") +
+    xlab("time interval (discrete)") +
+    ylab("mean of steps") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r mostActiveInterval, echo=FALSE}
+# Filter for maximum meanSteps and select corresponding interval
+mostActiveInterval <- filter(intervalActivity,
+                             meanSteps == max(intervalActivity$meanSteps))
+mostActiveInterval <- mostActiveInterval$interval
+```
+
+The 5-minute interval **`r mostActiveInterval`** contains the maximum number
+of steps on average across all the days.
+
 
 
 ## Imputing missing values
